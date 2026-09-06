@@ -1,11 +1,11 @@
 {
 	"schemaVersion": 1,
-	"id": "examplemod",
+	"id": "betterhotbarswitching",
 	"version": "${version}",
-	"name": "Example Mod",
-	"description": "This mod aims to help new BTA modders.",
+	"name": "Better Hotbar Switching",
+	"description": "Makes hotbar switching rely on scroll wheel.",
 	"authors": [
-		"Turnip Labs"
+		"FrigidOven"
 	],
 	"contact": {
 		"homepage": "",
@@ -16,11 +16,11 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"turniplabs.examplemod.ExampleMod"
+			"frigidoven.BetterHotbarSwitching"
 		]
 	},
 	"mixins": [
-		"examplemod.mixins.json"
+		"betterhotbarswitching.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=${fabricloader}",
