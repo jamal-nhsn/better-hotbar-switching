@@ -1,67 +1,58 @@
 package frigidoven.mixin;
 
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.PlayerLocal;
 import net.minecraft.client.input.InputDevice;
 import net.minecraft.client.option.GameSettings;
-import org.lwjgl.input.Mouse;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.core.player.inventory.container.ContainerInventory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import static net.minecraft.client.option.GameSettings.KEY_HOT_BAR_SWITCH;
+
 
 @Mixin(Minecraft.class)
-public class HandleSwitchHotbarMixin {
+public abstract class HandleSwitchHotbarMixin {
+
 	@Shadow public PlayerLocal thePlayer;
 	@Shadow public int hotbarSwapAnimationProgress;
 
-	@Unique private int mLastMouseDWheel = 0;
-	@Unique private int mLastSlot = 0;
-
-	@Unique private boolean processedScroll = false;
-
-	@Inject(
+	@WrapWithCondition(
 		method = "runTick",
-		at = @At("HEAD")
+		at = @At(
+			value = "INVOKE",
+			target = "Lnet/minecraft/core/player/inventory/container/ContainerInventory;changeCurrentSlot(I)V"
+		)
 	)
-	private void updateLocals(CallbackInfo ci) {
-		// Modding brings the worst out of us all...
-		processedScroll = false;
-		mLastMouseDWheel = Mouse.getDWheel();
-		if (thePlayer != null ) mLastSlot = thePlayer.inventory.getCurrentSlot();
-	}
-
-   @Inject(
-		method = "checkBoundInputs",
-		at = @At("HEAD"),
-		cancellable = true
-	)
-	private void handleHotbarSwitchAlternative(InputDevice currentInputDevice, CallbackInfoReturnable<Boolean> cir) {
-		if (GameSettings.KEY_HOT_BAR_SWITCH.isPressed()) {
-			int scrollDelta = Mouse.getDWheel() - mLastMouseDWheel;
-			if (scrollDelta != 0) {
-				thePlayer.inventory.setCurrentSlot(mLastSlot, false);
-				if (!processedScroll) {
-					scrollDelta = Integer.signum(scrollDelta);
-					boolean deltaIsNegative = scrollDelta < 0;
-
-					int currentHotbarOffset = thePlayer.inventory.getHotbarOffset();
-					int newHotbarOffset = (currentHotbarOffset + (deltaIsNegative ? 9 : 27)) % 36;
-					thePlayer.setHotbarOffset(newHotbarOffset);
-
-					hotbarSwapAnimationProgress -= 3 * scrollDelta;
-					if (Math.abs(hotbarSwapAnimationProgress) > 6) {
-						hotbarSwapAnimationProgress = hotbarSwapAnimationProgress < 0 ? -6 : 6;
-					}
-					processedScroll = true;
+	private boolean allowHotbarScroll(ContainerInventory inventory, int offset) {
+		if (KEY_HOT_BAR_SWITCH.isPressed()) {
+			if (!thePlayer.inventory.currentSlotLocked()) {
+				int sign = Integer.signum(offset);
+				thePlayer.setHotbarOffset((thePlayer.inventory.getHotbarOffset() + (sign < 0 ? 9 : 27)) % 36);
+				hotbarSwapAnimationProgress -= sign * 3;
+				if (Math.abs(hotbarSwapAnimationProgress) > 6) {
+					hotbarSwapAnimationProgress = hotbarSwapAnimationProgress < 0 ? -6 : 6;
 				}
 				thePlayer.inventory.changeCurrentSlot(0);
 			}
-			cir.setReturnValue(true);
+			return false;
 		}
+		return true;
+	}
+
+	@WrapOperation(
+		method = "checkBoundInputs",
+		at = @At(
+			value = "INVOKE",
+			target = "Lnet/minecraft/client/option/KeyBinding;isPressEvent(Lnet/minecraft/client/input/InputDevice;)Z"
+		)
+	)
+	private boolean disableHotbarSwitchPressed(KeyBinding keyBinding, InputDevice eventInputDevice, Operation<Boolean> original) {
+		return keyBinding != KEY_HOT_BAR_SWITCH && original.call(keyBinding, eventInputDevice);
 	}
 }
